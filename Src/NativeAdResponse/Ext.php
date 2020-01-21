@@ -1,8 +1,11 @@
 <?php
 
-/**
- * Created by YupChang on 2020-01-20
- */
-class Ext {
+namespace openrtb\NativeAdResponse;
+
+class Ext extends \openrtb\Abstractions\BaseModel {
+
+    protected $attributes = array(
+
+    );
 
 }

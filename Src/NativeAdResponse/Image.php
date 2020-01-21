@@ -1,8 +1,11 @@
 <?php
 
-/**
- * Created by YupChang on 2020-01-20
- */
-class Image {
+namespace openrtb\NativeAdResponse;
+
+class Image extends \openrtb\Abstractions\BaseModel {
+
+    protected $attributes = array(
+
+    );
 
 }

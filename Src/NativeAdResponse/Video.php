@@ -1,8 +1,11 @@
 <?php
 
-/**
- * Created by YupChang on 2020-01-20
- */
-class Video {
+namespace openrtb\NativeAdResponse;
+
+class Video extends \openrtb\Abstractions\BaseModel {
+
+    protected $attributes = array(
+
+    );
 
 }
