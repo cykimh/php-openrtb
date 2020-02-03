@@ -45,7 +45,7 @@ abstract class BaseModel {
             foreach ($this->attributes as $attr => $opts) {
                 if (!property_exists($data, $attr)) {
                     if (isset($opts['required']) && ($opts['required'] === true)) {
-                        throw new \openrtb\exceptions\ValidationException('Missing required attribute "' . $attr . '" for model ' . $this->modelName . '.');
+                        throw new \openrtb\Exceptions\ValidationException('Missing required attribute "' . $attr . '" for model ' . $this->modelName . '.');
                     } elseif (isset($opts['default_value'])) {
                         $this->set($attr, $opts['default_value']);
                     }

@@ -45,6 +45,7 @@ class NativeAdRequest extends \openrtb\Abstractions\BaseModel {
         ),
         'eventtrackers' => array(
             'type' => self::ATTR_ARRAY,
+            'sub_type' => 'openrtb\NativeAdRequest\EventTrackers',
         ),
         'privacy' => array(
             'type' => self::ATTR_INTEGER,
