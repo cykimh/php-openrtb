@@ -26,14 +26,14 @@ class Ad_served_v2 extends CI_Controller {
     public function __construct() {
         parent::__construct();
 
-//        $this->sDspUrl  = $this->config->item('ssl_domain') . '/' . get_class($this);
-//
-//        $this->config->load('ftp', true);
-//        $aFtpInfo       = $this->config->item('ftp');
-//        $this->sImgUrl  = $aFtpInfo['img']['domain'] . $aFtpInfo['img']['default_path'] . '/admixer_dsp_ad';
+        $this->sDspUrl  = $this->config->item('ssl_domain') . '/' . get_class($this);
 
-        $this->sImgUrl  = "impurl";
-        $this->sDspUrl = "dspurl";
+        $this->config->load('ftp', true);
+        $aFtpInfo       = $this->config->item('ftp');
+        $this->sImgUrl  = $aFtpInfo['img']['domain'] . $aFtpInfo['img']['default_path'] . '/admixer_dsp_ad';
+
+//        $this->sImgUrl = "impurl";
+//        $this->sDspUrl = "dspurl";
 
         try {
             $sRawData = file_get_contents('php://input');
