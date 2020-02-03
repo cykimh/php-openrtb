@@ -284,18 +284,50 @@ class Ad_served_v2 extends CI_Controller {
 
     // NativeRequest객체에 따른 NativeResponse객체 반환
     protected function _get_native_adm($sReq='') {
+
         $oNativeRequest = new \openrtb\NativeAdRequest\NativeAdRequest();
         $oNativeRequest->hydrate($sReq);
 
+        $oNativeResponse = new \openrtb\NativeAdResponse\NativeAdResponse();
+
+        $oNativeResponse->set('ver', $oNativeRequest->get('ver'));
         $aAssets = $oNativeRequest->get('assets');
 
-
-        var_dump(gettype($aAssets));
-        exit;
+        $aAssetsResponse = [];
         foreach($aAssets as $asset) {
             $oAsset = new \openrtb\NativeAdResponse\Assets();
-            var_dump($asset);
-            exit;
+            $oAsset->set('id', $asset->get('id'));
+
+            switch (true) {
+                case $asset->get('title') :
+                    $oTitle = new \openrtb\NativeAdResponse\Title();
+                    $oTitle->set('text', "Nasmedia Title");
+                    $oAsset->set('title', $oTitle);
+                    break;
+                case $asset->get('img') :
+                    $oImg = new \openrtb\NativeAdResponse\Image();
+                    $oAsset->set('');
+                    $oAsset->set('');
+                    $oAsset->set('');
+                    break;
+                case $asset->get('video') :
+                    $oVideo = new \openrtb\NativeAdResponse\Video();
+                    $oVideo->set('vasttag', $this->_get_adm("video"));
+                    $oAsset->set('video', $oVideo);
+                    break;
+                case $asset->get('data') :
+                    $oData = new \openrtb\NativeAdResponse\Data();
+                    $oData->set('value', "Data Field");
+                    break;
+                case $asset->get('link') :
+
+                    break;
+                default :
+                    break;
+            }
+            var_dump($asset->get('id'));
+
+            $aAssetsResponse[] = $oAsset;
         }
 
         $oNativeAdm = new \openrtb\NativeAdResponse\NativeAdResponse();
@@ -303,10 +335,7 @@ class Ad_served_v2 extends CI_Controller {
 //        $oNativeAdm->set
 
 
-
-
-
-
+        exit;
 
     }
 

@@ -6,11 +6,11 @@ class Assets extends \openrtb\Abstractions\BaseModel {
 
     protected $attributes = array(
         'id' => array(
-            'required' => true,
             'type' => self::ATTR_ID,
         ),
         'required' => array(
             'type' => self::ATTR_INTEGER,
+            'default_value' => 0,
         ),
         'title' => array(
             'type' => 'openrtb\NativeAdResponse\Title',
