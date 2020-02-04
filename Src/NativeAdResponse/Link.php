@@ -17,7 +17,7 @@ class Link extends \openrtb\Abstractions\BaseModel {
             'type' => self::ATTR_STRING,
         ),
         'ext' => array(
-            'type' => '\openrtb\NativeAdResponse\Ext',
+            'type' => 'openrtb\NativeAdResponse\Ext',
         ),
     );
 }

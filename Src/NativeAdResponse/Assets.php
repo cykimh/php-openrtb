@@ -24,7 +24,7 @@ class Assets extends \openrtb\Abstractions\BaseModel {
         'data' => array(
             'type' => 'openrtb\NativeAdResponse\Data',
         ),
-        'link' => array(
+        'link' => array(                                    // Link object for call to actions. The link object applies if the asset item is activated (clicked). If there is no link object on the asset, the parent link object on the bid response applies.
             'type' => 'openrtb\NativeAdResponse\Link',
         ),
         'ext' => array(

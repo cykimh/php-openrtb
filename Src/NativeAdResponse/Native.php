@@ -1,19 +1,49 @@
 <?php
 
 /**
- * Created by YupChang on 2020-01-20
+ * Created by YupChang on 2020-02-04
  */
 
 namespace openrtb\NativeAdResponse;
 
-class NativeAdResponse extends \openrtb\Abstractions\BaseModel {
+class Native extends \openrtb\Abstractions\BaseModel {
 
     protected $attributes = array(
-        'native' => array(
-            'required' => true,
-            'type' => 'openrtb\NativeAdResponse\Native',
-//            'type' => self::ATTR_STRING,
+        'ver' => array(
+            'type' => self::ATTR_STRING,
+            'default_value' => '1.2',
         ),
+        'assets' => array(
+            'type' => self::ATTR_ARRAY,
+            'sub_type' => 'openrtb\NativeAdResponse\Assets',
+        ),
+        'assetsurl' => array(
+            'type' => self::ATTR_STRING,
+        ),
+        'dcourl' => array(
+            'type' => self::ATTR_STRING,
+        ),
+        'link' => array( // Destination Link. This is default link object for the ad. Individual assets can also have a link object which applies if the asset is activated(clicked). If the asset doesn’t have a link object, the parent link object applies. See LinkObject Definition
+            'type' => 'openrtb\NativeAdResponse\Link',
+        ),
+        'imptrackers' => array(
+            'type' => self::ATTR_ARRAY,
+            'sub_type' => self::ATTR_STRING,
+        ),
+        'jstrackers' => array(
+            'type' => self::ATTR_STRING,
+        ),
+        'eventtrackers' => array(
+            'type' => self::ATTR_ARRAY,
+            'sub_type' => 'openrtb\NativeAdResponse\EventTrackers',
+        ),
+        'privacy' => array(
+            'type' => self::ATTR_STRING,
+        ),
+        'ext' => array(
+            'type' => 'openrtb\NativeAdResponse\Ext',
+        ),
+
     );
     /* {
     "native" : {

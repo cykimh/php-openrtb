@@ -31,7 +31,7 @@ class NativeAdRequest extends \openrtb\Abstractions\BaseModel {
             'default_value' => 0,
         ),
         'assets' => array(
-            'required' => true,
+//            'required' => true,
             'type' => self::ATTR_ARRAY,
             'sub_type' => 'openrtb\NativeAdRequest\Assets',
         ),
@@ -54,7 +54,9 @@ class NativeAdRequest extends \openrtb\Abstractions\BaseModel {
         'ext' => array(
             'type' => 'openrtb\NativeAdRequest\Ext',
         ),
-
+        'native' => array(
+            'type' => 'openrtb\NativeAdRequest\NativeAdRequest',
+        ),
     );
 
 }

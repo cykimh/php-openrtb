@@ -208,7 +208,7 @@ abstract class BaseModel {
      * @return string
      */
     public function getDataAsJson() {
-        return json_encode($this->getDataAsArray());
+        return json_encode($this->getDataAsArray(), JSON_UNESCAPED_SLASHES);
     }
 
     protected function isModel($type) {

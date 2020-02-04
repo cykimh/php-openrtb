@@ -16,9 +16,31 @@ class Data extends \openrtb\Abstractions\BaseModel {
             'type' => self::ATTR_STRING,
         ),
         'ext' => array(
-            'type' => '\openrtb\NativeAdResponse\Ext',
+            'type' => 'openrtb\NativeAdResponse\Ext',
+        ),
+        'label' => array(
+            'type' => self::ATTR_STRING,
         ),
     );
+
+    protected $type_label = array(
+        1 => "sponsored",
+        2 => "description",
+        3 => "rating",
+        4 => "likes",
+        5 => "downloads",
+        6 => "price",
+        7 => "saleprice",
+        8 => "phone",
+        9 => "address",
+        10 => "desc2",
+        11 => "displayurl",
+        12 => "cta",
+    );
+
+    public function get_type_label($type) {
+        return $this->type_label[$type] ?? "Data Type Invalid";
+    }
 
 
 }

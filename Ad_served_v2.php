@@ -2,7 +2,7 @@
 /**
  * Created by YupChang on 2020-01-13
  */
-require_once APPPATH . "/third_party/php-openrtb/PHPOpenRtb.php";
+require_once APPPATH . "/third_party/PHPOpenRtb/PHPOpenRtb.php";
 
 class Ad_served_v2 extends CI_Controller {
 
@@ -14,103 +14,102 @@ class Ad_served_v2 extends CI_Controller {
         [15, 15], [20, 20], [40, 40], [60, 60]
     );
 
-    protected $oBidRequest;
-    protected $oBidResponse;
+    protected $oBidRequest;             //
+    protected $oBidResponse;            //
 
-    protected $sAdmixerDspUrl;             //
-    protected $sClickTrackingUrl;
-    protected $sAdImgUrl;
-    protected $sRedirectUrl;
+    protected $sAdmixerDspUrl;          // AdmixerNasmedia Url
+    protected $sClickTrackingUrl;       // 클릭 트래킹 Url
+    protected $sImpTrackingUrl;         // 노출 트래킹 Url
+    protected $sAdImgUrl;               // 광고 이미지 Server Url
+    protected $sRedirectUrl;            // 클릭 Redirect Url
+    protected $sAdDomainUrl;            // 광고주도메인 url
 
+    protected $bTest;    // 에러 출력유무
     /**
      * Ad_served2 constructor.
      */
     public function __construct() {
         parent::__construct();
-
-<<<<<<< HEAD
-        $this->sDspUrl  = $this->config->item('ssl_domain') . '/' . get_class($this);
-
-        $this->config->load('ftp', true);
-        $aFtpInfo       = $this->config->item('ftp');
-        $this->sImgUrl  = $aFtpInfo['img']['domain'] . $aFtpInfo['img']['default_path'] . '/admixer_dsp_ad';
-
-//        $this->sImgUrl = "impurl";
-//        $this->sDspUrl = "dspurl";
-=======
-//        $this->sAdmixerDspUrl  = $this->config->item('ssl_domain') . '/' . get_class($this);
-//
-//        $this->config->load('ftp', true);
-//        $aFtpInfo       = $this->config->item('ftp');
-//        $this->sAdImgUrl  = $aFtpInfo['img']['domain'] . $aFtpInfo['img']['default_path'] . '/admixer_dsp_ad';
-
-        $this->sAdImgUrl            = "impurl";
-        $this->sAdmixerDspUrl       = "dspurl";
-        $this->sClickTrackingUrl    = $this->sAdmixerDspUrl . "/click_tracking?";
-        $this->sRedirectUrl         = "https://partner.admixer.co.kr";
->>>>>>> b916e5676ec8cb0bb224135543cf1e53de70e932
-
-        try {
-            $sRawData = file_get_contents('php://input');
-
-            $this->oBidRequest = new \openrtb\BidRequest\BidRequest();
-            $this->oBidRequest->hydrate($sRawData);
-
-        } catch (\Exception $e) {
-            var_dump($e->getMessage());
-        }
-
-        $this->oBidResponse = new \openrtb\BidResponse\BidResponse();
-
     }
 
+    public function init() {
+        // Init
+        $this->config->load('ftp', true);
+        $aFtpInfo                   = $this->config->item('ftp');
+
+        $this->sAdmixerDspUrl       = $this->config->item('ssl_domain') . '/' . get_class($this);
+        $this->sAdImgUrl            = $aFtpInfo['img']['domain'] . $aFtpInfo['img']['default_path'] . '/admixer_dsp_ad';
+        $this->sClickTrackingUrl    = $this->sAdmixerDspUrl . "/click_tracking?";
+        $this->sImpTrackingUrl      = $this->sAdmixerDspUrl . "/imp_tracking?";
+        $this->sRedirectUrl         = "https://partner.admixer.co.kr";
+        $this->sAdDomainUrl         = "http://www.nasmedia.co.kr/ko/index.do";
+
+        $this->bTest = $this->input->get('test', false);
+    }
     public function ad_req() {
+
+        // 기본데이터 초기화
+        $this->init();
+
+        $sRawData = file_get_contents('php://input');
+
+        if(empty($sRawData)) $this->errorMessage('Empty RawData');
+
+        // ad_req_log 테이블에 작성
+        $nLogId = $this->_logging_ad_req($sRawData, 0);
+
+        $this->oBidRequest = new \openrtb\BidRequest\BidRequest();
+        $this->oBidRequest->hydrate($sRawData);
+
+        $this->oBidResponse = new \openrtb\BidResponse\BidResponse();
 
         $sReqId     = $this->oBidRequest->get('id');
         $oReqImp    = $this->oBidRequest->get('imp');
 
-        if (!isset($oReqImp)) {
-            $this->_no_bid_return();
+        if (empty($oReqImp)) {
+            $this->errorMessage('Empty Request Imp Object');
         }
 
         $this->oBidResponse->set('id', $sReqId);
-        $this->oBidResponse->set('bidid', '' ); // Todo : ??
-        $this->oBidResponse->set('cur', $this->oBidRequest->get('cur') ?? 'KRW');
+        // $this->oBidResponse->set('bidid', ''); // bid
+        $this->oBidResponse->set('cur', $this->oBidRequest->get('cur')[0] ?? 'KRW'); // 요청cur은 문자배열, 응답cur은 문자
 
-        $oSeats = array();
+        // SeatBid 객체 생성 ex) Bidder
+        $oSeatBid = new \openrtb\BidResponse\SeatBid();
+        $oSeatBid->set('seat', 'admixer_nasmedia_'.uniqid());
+
+        $oBids = [];
         foreach($oReqImp as $imp) {
-            $oSeatBid = array();
+            $oBid = [];
             switch (true) {
                 case $imp->get('banner') :
-                    $oSeatBid = $this->_banner_ad_req($imp);
+                    $oBid = $this->_banner_ad_req($imp);
                     break;
                 case $imp->get('video') :
-                    $oSeatBid = $this->_video_ad_req($imp);
+                    $oBid = $this->_video_ad_req($imp);
                     break;
                 case $imp->get('native') :
-                    $oSeatBid = $this->_native_ad_req($imp);
+                    $oBid = $this->_native_ad_req($imp);
                     break;
                 default :
-                    $this->_no_bid_return();
+                    $this->errorMessage('Invalid Imp Object');
                     break;
             }
-            $oSeats[] = $oSeatBid;
+            $oBids[] = $oBid;
         }
 
-        $this->oBidResponse->set('seatbid', $oSeats);
-//        $this->oBidResponse->set('nbr', ''); // Todo : ??
+        $oSeatBid->set('bid', $oBids);
+        $this->oBidResponse->set('seatbid', [$oSeatBid]);
+        // $this->oBidResponse->set('nbr', ''); // 노출광고없을때 204 Header를 응답 nbr필요X
+
+        $sBidResponse = $this->oBidResponse->getDataAsJson();
+        $this->_logging_ad_req($sBidResponse, $nLogId);
 
         header('Content-Type: application/json');
-        echo $this->oBidResponse->getDataAsJson();
+        echo $sBidResponse;
     }
 
-
     protected function _banner_ad_req($oImp) {
-
-        $oSeatBid = new \openrtb\BidResponse\SeatBid();
-
-        $oSeatBid->set('seat', 'admixer_nasmedia_'.uniqid());
-        $sBidId = sha1(uniqid());
 
         $oReqBannerObj = $oImp->get('banner');
 
@@ -123,198 +122,152 @@ class Ad_served_v2 extends CI_Controller {
             $nW = $aImgSize[0] ?? 0;
             $nH = $aImgSize[1] ?? 0;
         } else {
-            throw new \openrtb\Exceptions\ValidationException('BannerObject Size Is Not Exist');
+            $this->errorMessage("Banner Request Object Size Is Not Exist");
         }
 
         $bValid = $this->_validation_size("banner", $nW, $nH);
-        if(!$bValid) $this->_no_bidding_return();
+        if(!$bValid) $this->errorMessage("Not Fount Valid Banner Size");
 
         // BidResponse 객체 생성
-        $oBid = new \openrtb\BidResponse\Bid();
-        $oBid->set('id', $sBidId);
-        $oBid->set('impid', $oImp->get('id'));
-        $oBid->set('price', $oImp->get('bidfloor'));
+        $oBid = $this->_get_common_bid($oImp);
 
         $sAdm = $this->_get_adm("banner", $nW, $nH);
+        $sQueryString = http_build_query(['bid_id'=> $oImp->get('id'), 'size_cd'=> $nW.'x'.$nH]);
+        $sAdm = str_replace('[$IMP_TRACKING]', $this->sImpTrackingUrl . $sQueryString, $sAdm);
+        $sAdm = str_replace('[$CLICK_TRACKING]', $this->sClickTrackingUrl . $sQueryString, $sAdm);
+
         $oBid->set('adm', $sAdm);
         $oBid->set('w', $nW);
         $oBid->set('h', $nH);
-        /*
-                $oBid->set('adid', '');
-                $oBid->set('iurl', '');
-                $oBid->set('nurl', '');
-        */
-        $oBid->set('adomain', [$this->sRedirectUrl]);
 
         $oExt = new \openrtb\BidResponse\Ext();
 
-        $sQueryString = http_build_query(['bid_id' => $sBidId, 'size_cd' => $nW.'X'.$nH]);
         $oExt->set('clickurl', $this->sClickTrackingUrl . $sQueryString);
-
         $oBid->set('ext', $oExt);
 
-        $oSeatBid->set('bid', [$oBid]);
-        return $oSeatBid;
+        return $oBid;
 
-        /*       {
-                   "id": "[$BID_ID]",
-                   "cur": "KRW",
-                   "seatbid": [{
-                           "seat": "Admixer_Dsp",
-                       "bid": [{
-                               "id": "1",
-                           "impid": "[$BID_IMP_ID]",
-                           "price": [$BID_BIDFLOOR],
-                           "adid": "a1a4b777-b6f5-45f6-9baf-a6fac07cef15",
-                           "crid": "0",
-                           "cid": "0",
-                           "adm": [$BID_ADM],
-                           "w": [$BID_WIDTH],
-                           "h": [$BID_HEIGHT],
-                           "iurl": null,
-                           "nurl": "",
-                           "ext": {
-                                   "clickurl": "[$CLICK_TRACKING]"
-                           },
-                           "adomain": ["admixer.co.kr"]
-                       }]
-                   }]
-               }
-        */
     }
     protected function _video_ad_req($oImp) {
 
-        $oSeatBid = new \openrtb\BidResponse\SeatBid();
-
-        $oSeatBid->set('seat', 'Admixer_Dsp_'.uniqid());
-        $sBidId     = sha1(uniqid());
-
         // BidResponse 객체 생성
-        $oBid = new \openrtb\BidResponse\Bid();
-        $oBid->set('id', $sBidId);
-        $oBid->set('impid', $oImp->get('id'));
-        $oBid->set('price', $oImp->get('bidfloor'));
+        $oBid = $this->_get_common_bid($oImp);
+
+        $nW = $oImp->get('video')->get('w');
+        $nH = $oImp->get('video')->get('h');
+        $oBid->set('w', $nW);
+        $oBid->set('h', $nH);
 
         $sAdm = $this->_get_adm("video");
+        // 쌤플 Adm 트래킹추가
+        $sQueryString = http_build_query(['bid_id'=> $oImp->get('id'), 'size_cd'=> $nW.'x'.$nH]);
+        $sAdm = str_replace('[$IMP_TRACKING]', $this->sImpTrackingUrl . $sQueryString, $sAdm);
+        $sAdm = str_replace('[$CLICK_TRACKING]', $this->sClickTrackingUrl . $sQueryString, $sAdm);
+
         $oBid->set('adm', $sAdm);
-
-        $oBid->set('w', $oImp->get('video')->get('w'));
-        $oBid->set('h', $oImp->get('video')->get('h'));
-
-        $oBid->set('adomain', [$this->sRedirectUrl]);
-//        $oBid->set('cid', 0);
-//        $oBid->set('crid', 0);
-//        $oBid->set('iurl', 0);
-//        $oBid->set('bundle', 0);
-//        $oBid->set('cat', 0);
-//        $oBid->set('attr', 0);
-//        $oBid->set('dealid', '');
 
         $oExt = new \openrtb\BidResponse\Ext();
         $oExt->set('bidtype', 0);
         $oBid->set('ext', $oExt);
 
-        $oSeatBid->set('bid', [$oBid]);
-
-        return $oSeatBid;
+        return $oBid;
     }
     protected function _native_ad_req($oImp) {
 
-        $oSeatBid = new \openrtb\BidResponse\SeatBid();
-        $oSeatBid->set('seat', 'Admixer_Dsp_' . uniqid());
+        $oBid = $this->_get_common_bid($oImp);
+
+        $sNativeAdm = $oImp->get('native')->get('request');
+
+        $sAdm = $this->_get_native_adm($oImp->get('id'), $sNativeAdm);
+        $oBid->set('adm', $sAdm);
+
+        return $oBid;
+    }
+
+    protected function _get_common_bid($oImp) {
+
+        $oBid = new \openrtb\BidResponse\Bid();
 
         $sBidId = sha1(uniqid());
 
-        $oBid = new \openrtb\BidResponse\Bid();
         $oBid->set('id', $sBidId);
         $oBid->set('impid', $oImp->get('id'));
         $oBid->set('price', $oImp->get('bidfloor'));
 
-        $sNativeAdm = $oImp->get('native')->get('request');
+        $oBid->set('nurl', 'http://example-dsp.com/win-notice-url&price=${AUCTION_PRICE}');
+        $oBid->set('cid', '1');     // 캠페인 ID
+        $oBid->set('crid', '1');    // 광소소재 ID
+        $oBid->set('adomain', [$this->sAdDomainUrl]);
 
-        $sAdm = $this->_get_native_adm($sNativeAdm);
-        $oBid->set('adm', $sAdm);
-//        $oBid->set('w', $oImp->get('video')->get('w'));
-//        $oBid->set('h', $oImp->get('video')->get('h'));
-
-        $oSeatBid->set('bid', [$oBid]);
-
-        return $oSeatBid;
-        /*    {
-                "id": "[$BID_ID]",
-        "cur": "USD",
-        "seatbid": [{
-                "seat": "Admixer_Dsp",
-            "bid": [{
-                    "id": "1",
-                "impid": "[$BID_IMP_ID]",
-                "price": [$BID_BIDFLOOR],
-                "nurl": "http://example-dsp.com/win-notie-url&price=${AUCTION_PRICE}",
-                "adm": [$BID_ADM],
-                "cid": "1",
-                "crid": "1",
-                "adomain": ["https://partner.admixer.co.kr"]
-            }]
-        }]
-    }*/
-
+        /*
+        $oBid->set('bundle', 0);
+        $oBid->set('cat', 0);
+        $oBid->set('attr', 0);
+        $oBid->set('dealid', '');
+        $oBid->set('adid', ''); // 낙찰된 광고Id ex) a1a4b777-b6f5-45f6-9baf-a6fac07cef15
+        $oBid->set('iurl', '');
+        */
+        return $oBid;
     }
 
-
-
-
-
     // NativeRequest객체에 따른 NativeResponse객체 반환
-    protected function _get_native_adm($sReq='') {
-
+    protected function _get_native_adm($sImpId='', $sReq='') {
         $oNativeRequest = new \openrtb\NativeAdRequest\NativeAdRequest();
         $oNativeRequest->hydrate($sReq);
 
+        $oNativeRequest = $oNativeRequest->get('native') ?? $oNativeRequest;
+
         // Native 응답객체 선언 생성
-        $oNativeResponse = new \openrtb\NativeAdResponse\NativeAdResponse();
+        $oNative = new \openrtb\NativeAdResponse\Native();
 
         // Ver
-        $oNativeResponse->set('ver', $oNativeRequest->get('ver'));
+        $oNative->set('ver', $oNativeRequest->get('ver'));
 
         // Assets
         $aAssets = $oNativeRequest->get('assets');
 
         $aAssetsResponse = [];
-
         foreach($aAssets as $asset) {
             $oAsset = new \openrtb\NativeAdResponse\Assets();
             $oAsset->set('id', $asset->get('id'));
 
-            $bRequired = 1;
-            $bValid = false;
+            $bRequired = $asset->get('required')??0;
+            $oAsset->set('required', $bRequired);
+
+            $bValid = true;
 
             switch (true) {
                 case $asset->get('title') :
-                    $bRequired = $asset->get('title')->get('required');
+
+                    $oReqTitle = $asset->get('title');
+
+                    $sText = "AdmixerNasmedia";
+
+                    $bValid = ($sText <= strlen($oReqTitle->get('len')));
 
                     $oTitle = new \openrtb\NativeAdResponse\Title();
-                    $oTitle->set('text', "Nasmedia Title");
+                    $oTitle->set('text', $sText);
                     $oAsset->set('title', $oTitle);
                     break;
 
                 case $asset->get('img') :
 
-                    $bRequired = $asset->get('img')->get('required');
+                    $oReqImg = $asset->get('img');
+
                     $oImg = new \openrtb\NativeAdResponse\Image();
 
-                    $sImgType = ($asset->get('img')->get('type') == 3) ? 'banner' : 'icon'; // 1: Icon, 3: Main
+                    $sImgType = ($oReqImg->get('type') == 3) ? 'banner' : 'icon'; // 1: Icon, 3: Main
                     // 배너 사이즈가 바로 있을때
-                    if ($asset->get('img')->get('w') && $asset->get('img')->get('h')) {
-                        $nW = $asset->get('img')->get('w');
-                        $nH = $asset->get('img')->get('h');
+                    if ($oReqImg->get('w') && $oReqImg->get('h')) {
+                        $nW = $oReqImg->get('w');
+                        $nH = $oReqImg->get('h');
 
-                    } else if ($asset->get('img')->get('wmin') && $asset->get('img')->get('hmin')) {
-                        $aImgSize = $this->_search_image_size($sImgType, $asset->get('img')->get('wmin'), $asset->get('img')->get('hmin'));
+                    } else if ($oReqImg->get('wmin') && $oReqImg->get('hmin')) {
+                        $aImgSize = $this->_search_image_size($sImgType, $oReqImg->get('wmin'), $oReqImg->get('hmin'));
                         $nW = $aImgSize[0] ?? 0;
                         $nH = $aImgSize[1] ?? 0;
                     } else {
-                        throw new \openrtb\Exceptions\ValidationException('Native Img Size Is Not Exist');
-//                        $this->_no_bidding_return();
+                        $this->errorMessage('Native Img Size Is Not Exist');
                     }
 
                     $bValid = $this->_validation_size($sImgType, $nW, $nH);
@@ -324,24 +277,22 @@ class Ad_served_v2 extends CI_Controller {
                     break;
 
                 case $asset->get('video') :
-                    $bRequired = $asset->get('video')->get('required');
+                    $oReqVideo = $asset->get('video');
 
                     $oVideo = new \openrtb\NativeAdResponse\Video();
-                    $oVideo->set('vasttag', $this->_get_adm("video"));
+                    $oVideo->set('vasttag', $oVideo->getVastTag());
                     $oAsset->set('video', $oVideo);
                     break;
 
                 case $asset->get('data') :
-                    $bRequired = $asset->get('data')->get('required');
+
+                    $oReqData = $asset->get('data');
 
                     $oData = new \openrtb\NativeAdResponse\Data();
-                    $oData->set('value', "Data Field");
+                    $oData->set('label', $oData->get_type_label($oReqData->get('type')));
+                    $oData->set('value', "Data Field_{$oReqData->get('type')}");
                     $oAsset->set('data', $oData);
-                    break;
 
-                case $asset->get('link') :
-
-                    $oLink = new \openrtb\NativeAdResponse\Link();
                     break;
 
                 default :
@@ -349,17 +300,20 @@ class Ad_served_v2 extends CI_Controller {
             }
 
             if(!$bValid && !$bRequired) continue;
-            if(!$bValid) $this->_no_bid_return();
+            if(!$bValid) {
+                $this->errorMessage('Native Asset Invalid');
+            }
 
             $aAssetsResponse[] = $oAsset;
         }
 
-        $oNativeResponse->set('assets', $aAssetsResponse);
+        $oNative->set('assets', $aAssetsResponse);
 
         // Link
-        $oLink = new \openrtb\NativeAdResponse\Link();
-        $oLink->set('url', $this->sRedirectUrl);                // Partner 사이트로 이동
-        $oNativeResponse->set('link', $oLink);
+        $oLink = new \openrtb\NativeAdResponse\Link();      // Asset객체 내부에 있거나 Bid객체 내부에 있거나
+        $oLink->set('url', $this->sRedirectUrl);            // Partner 사이트로 이동
+        $oLink->set('clicktrackers', [$this->sClickTrackingUrl . http_build_query(['bid_id'=> $sImpId, 'size_cd'=> 'native'])]);
+        $oNative->set('link', $oLink);
 
         // EventTrackers
         $aEventTrackers = $oNativeRequest->get('eventtrackers');
@@ -375,17 +329,25 @@ class Ad_served_v2 extends CI_Controller {
 
                 $aEventTrackersResponse[] = $oEventTracker;
             }
-            $oNativeResponse->set('eventtrackers', $aEventTrackersResponse);
+            $oNative->set('eventtrackers', $aEventTrackersResponse);
+        } else {
+
+            $oNative->set('imptrackers', [$this->sImpTrackingUrl . http_build_query(['bid_id'=> $sImpId, 'size_cd'=> 'native'])]);
+            $oNative->set('jstrackers', '');
         }
 
         /*
-                $oNativeResponse->set('assetsurl', '');
-                $oNativeResponse->set('dcourl', '');
-                $oNativeResponse->set('imptrackers', '');
-                $oNativeResponse->set('jstrackers', '');
-                $oNativeResponse->set('eventtrackers', '');
-                $oNativeResponse->set('privacy', '');
+                $oNative->set('assetsurl', '');
+                $oNative->set('dcourl', '');
+                $oNative->set('privacy', '');
         */
+
+//        var_dump($oNative); exit;
+
+        // Native로 한번 감싸줌
+        $oNativeResponse = new \openrtb\NativeAdResponse\NativeAdResponse();
+        $oNativeResponse->set('native', $oNative);
+
         return $oNativeResponse->getDataAsJson();
 
     }
@@ -416,7 +378,7 @@ class Ad_served_v2 extends CI_Controller {
     // Ad 소재 Url
     protected function _get_ad_url($type, $width, $height) {
 
-        return $this->sAdImgUrl . "/{$type}_{$width}_{$height}";
+        return $this->sAdImgUrl . "/{$type}_{$width}x{$height}.png";
     }
 
     // 정의해놓은 admarkup 불러오기
@@ -428,13 +390,37 @@ class Ad_served_v2 extends CI_Controller {
         $sQuery     = "SELECT * FROM admixer_dsp.adm_sample WHERE 1 AND adformat_id = ? AND width = ? AND height = ?";
         $aResult    = $this->db->query($sQuery, [$nAdformatId, $width, $height])->row_array();
 
-        return preg_replace('/\r\n|\r|\n/', '', $aResult['adm']);
+        return preg_replace('/\r\n|\r|\n/','', $aResult['adm']);
+    }
+
+
+    // Error 메시지 출력
+    protected function errorMessage($message = "") {
+        if(!$this->bTest) $this->_no_bid_return();
+
+        throw new \openrtb\Exceptions\ValidationException($message);
     }
 
     // Return HTTP 204 No Content 반환
     protected function _no_bid_return() {
         header("HTTP/1.0 204 No Content");
         exit;
+    }
+
+    // 요청응답 테스트하기 위한 Logging
+    protected function _logging_ad_req($sContent, $nLogId) {
+        $this->db   = $this->load->database('admixer', TRUE);    // 리포트는 SlaveDb를 바라보도록
+
+        if(empty($nLogId)) {
+            $sQuery = "INSERT INTO admixer_dsp.ad_req_log (ad_req,req_date,remote_addr) VALUES(? ,NOW(), '{$_SERVER['REMOTE_ADDR']}')";
+            $this->db->query($sQuery, array($sContent));
+            return $this->db->insert_id();
+        } else {
+            $sQuery = "UPDATE admixer_dsp.ad_req_log SET ad_res = ? WHERE log_id = ?";
+            $this->db->query($sQuery, array($sContent, $nLogId));
+            return 1;
+        }
+
     }
 
     // 노출 측정
