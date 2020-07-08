@@ -24,7 +24,8 @@ class Ad_served_v2 extends CI_Controller {
     protected $sRedirectUrl;            // 클릭 Redirect Url
     protected $sAdDomainUrl;            // 광고주도메인 url
 
-    protected $bTest;    // 에러 출력유무
+    protected $bTest;   // 에러 출력유무
+    protected $nLogId;  // 요청응답 로그Id
     /**
      * Ad_served2 constructor.
      */
@@ -55,8 +56,8 @@ class Ad_served_v2 extends CI_Controller {
 
         if(empty($sRawData)) $this->errorMessage('Empty RawData');
 
-        // ad_req_log 테이블에 작성
-        $nLogId = $this->_logging_ad_req($sRawData, 0);
+        // dsp_rtb_log 테이블에 작성
+        $this->nLogId = $this->_logging_ad_req($sRawData);
 
         $this->oBidRequest = new \openrtb\BidRequest\BidRequest();
         $this->oBidRequest->hydrate($sRawData);
@@ -103,7 +104,7 @@ class Ad_served_v2 extends CI_Controller {
         // $this->oBidResponse->set('nbr', ''); // 노출광고없을때 204 Header를 응답 nbr필요X
 
         $sBidResponse = $this->oBidResponse->getDataAsJson();
-        $this->_logging_ad_req($sBidResponse, $nLogId);
+        $this->_logging_ad_req($sBidResponse);
 
         header('Content-Type: application/json');
         echo $sBidResponse;
@@ -126,7 +127,7 @@ class Ad_served_v2 extends CI_Controller {
         }
 
         $bValid = $this->_validation_size("banner", $nW, $nH);
-        if(!$bValid) $this->errorMessage("Not Fount Valid Banner Size");
+        if(!$bValid) $this->errorMessage("No valid banner size found");
 
         // BidResponse 객체 생성
         $oBid = $this->_get_common_bid($oImp);
@@ -153,17 +154,15 @@ class Ad_served_v2 extends CI_Controller {
         // BidResponse 객체 생성
         $oBid = $this->_get_common_bid($oImp);
 
-        $nW = $oImp->get('video')->get('w');
-        $nH = $oImp->get('video')->get('h');
-        $oBid->set('w', $nW);
-        $oBid->set('h', $nH);
-
-        $sAdm = $this->_get_adm("video");
+        $sAdm = $this->_get_adm("video", 640, 360);
         // 쌤플 Adm 트래킹추가
-        $sQueryString = http_build_query(['bid_id'=> $oImp->get('id'), 'size_cd'=> $nW.'x'.$nH]);
+        $sQueryString = http_build_query(['bid_id'=> $oImp->get('id'), 'size_cd'=> 'video']);
         $sAdm = str_replace('[$IMP_TRACKING]', $this->sImpTrackingUrl . $sQueryString, $sAdm);
         $sAdm = str_replace('[$CLICK_TRACKING]', $this->sClickTrackingUrl . $sQueryString, $sAdm);
 
+        if(empty($sAdm)) {
+            $this->errorMessage("Empty Vast ADM");
+        }
         $oBid->set('adm', $sAdm);
 
         $oExt = new \openrtb\BidResponse\Ext();
@@ -188,18 +187,20 @@ class Ad_served_v2 extends CI_Controller {
 
         $oBid = new \openrtb\BidResponse\Bid();
 
-        $sBidId = sha1(uniqid());
+        $sBidId = uniqid();
 
         $oBid->set('id', $sBidId);
         $oBid->set('impid', $oImp->get('id'));
-        $oBid->set('price', $oImp->get('bidfloor'));
+
+        $nPrice = ($oImp->get('bidfloor') > 0) ? $oImp->get('bidfloor') : (mt_rand(1, 10000)/10000);
+        $oBid->set('price', $nPrice);
 
         $oBid->set('nurl', 'http://example-dsp.com/win-notice-url&price=${AUCTION_PRICE}');
-        $oBid->set('cid', '1');     // 캠페인 ID
-        $oBid->set('crid', '1');    // 광소소재 ID
+        $oBid->set('cid', 'campaign111');     // 캠페인 ID
+        $oBid->set('crid', 'creative112');    // 광소소재 ID
         $oBid->set('adomain', [$this->sAdDomainUrl]);
 
-        /*
+        /* 안쓰는 설정
         $oBid->set('bundle', 0);
         $oBid->set('cat', 0);
         $oBid->set('attr', 0);
@@ -396,6 +397,7 @@ class Ad_served_v2 extends CI_Controller {
 
     // Error 메시지 출력
     protected function errorMessage($message = "") {
+        @$this->_logging_ad_req("", $message);
         if(!$this->bTest) $this->_no_bid_return();
 
         throw new \openrtb\Exceptions\ValidationException($message);
@@ -408,17 +410,23 @@ class Ad_served_v2 extends CI_Controller {
     }
 
     // 요청응답 테스트하기 위한 Logging
-    protected function _logging_ad_req($sContent, $nLogId) {
+    protected function _logging_ad_req($sContent = "", $sMsg = "") {
         $this->db   = $this->load->database('admixer', TRUE);    // 리포트는 SlaveDb를 바라보도록
 
-        if(empty($nLogId)) {
-            $sQuery = "INSERT INTO admixer_dsp.ad_req_log (ad_req,req_date,remote_addr) VALUES(? ,NOW(), '{$_SERVER['REMOTE_ADDR']}')";
+        if(empty($this->nLogId)) {
+            $sQuery = "INSERT INTO admixer_dsp.dsp_rtb_log (ad_req_data, req_date, remote_addr) VALUES(? ,NOW(), '{$_SERVER['REMOTE_ADDR']}')";
             $this->db->query($sQuery, array($sContent));
             return $this->db->insert_id();
         } else {
-            $sQuery = "UPDATE admixer_dsp.ad_req_log SET ad_res = ? WHERE log_id = ?";
-            $this->db->query($sQuery, array($sContent, $nLogId));
+            if(!empty($sContent)) {
+                $sQuery = "UPDATE admixer_dsp.dsp_rtb_log SET ad_res_data = ?, result_msg = ? WHERE log_id = ?";
+                $this->db->query($sQuery, array($sContent, 'Success', $this->nLogId));
+            } else {
+                $sQuery = "UPDATE admixer_dsp.dsp_rtb_log SET result_msg = ? WHERE log_id = ?";
+                $this->db->query($sQuery, array($sMsg, $this->nLogId));
+            }
             return 1;
+
         }
 
     }
